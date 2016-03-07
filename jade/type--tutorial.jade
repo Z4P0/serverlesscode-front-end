@@ -4,6 +4,189 @@ block title
   title Using Python In The Serverless Framework | Serverless Code
 
 block content
-  .row.page-section
-    .columns.medium-8.medium-centered.large-6
-      h1 Using Python In The Serverless Framework
+  article.article
+    .row.align-center.page-section
+      .column.medium-8.large-6
+        h1 Using Python In The Serverless Framework
+        p Take The Python Support In The Serverless Framework For A Spin
+        .article-meta
+          span.posted Fed 21, 2016
+          span.updated
+        p The native language of the <a href="#" rel="ext">Serverless Framework</a> is Javascript, since that’s both the default runtime for Lambda and the language the serverless command-line tool is written in. But since version 0.2.1 <code>Serverless</code> has supported deploying services to Lambda’s Python 2.7 environment.
+        p In this post we’ll start a new Serverless project and use the Python runtime to make a service that gives out the latest and greatest feline facts. We’ll call it <code>catfacts.py</code>.
+        p At the time of this writing, version 0.4.2 is the latest version, so all examples will be based on that.
+        h2(id='bootstrapping:1533b6ea89e8e4028a5a73e91a70fd69') Bootstrapping
+        p There are a few options for installing the Serverless CLI, but the quickest is
+          | to do
+          code npm install -g serverless
+          | . For more installation options, see the
+          a(href='http://docs.serverless.com/docs/installing-serverless') installation docs
+          | . There’s a command to create a new project and
+          | deploy S3 buckets to handle assets and IAM roles.
+        pre.
+        p This sets up the base structure for the project, you’ll want to specify a
+          | different value for the
+          code --domain
+          |  option to avoid conflicting with my project
+          | bucket. Wait a few minutes for CloudFormation to build your resources and then
+          | we can create the
+          a(href='http://docs.serverless.com/docs/component') component
+          |  where our API will live.
+        pre.
+        h2(id='writing-common-code:1533b6ea89e8e4028a5a73e91a70fd69') Writing Common Code
+        p Now that we have a function, let’s write the shared code that all functions
+          | will need. In this case, all our functions need to be able to read facts about
+          | cats from our JSON file format. Here’s an example file with two fun feline
+          | facts.
+        pre.
+        p The format is a simple JSON list. The full fact list is
+          a(href='https://github.com/ryansb/serverless-cat-facts/blob/master/facts/catfacts.json') here
+          |  for
+          | you to copy. Put it in the component directory,
+          code facts
+          | , so it will be deployed
+          | along with any function in the component.
+        p Here’s the contents of
+          code facts/lib/__init__.py
+          |  that will take our
+          code catfacts.json
+          |  file and return a parsed version.
+        pre.
+        p In the
+          code facts/show/handler.py
+          | , we can call this and then pick a fact to send
+          | back to the user.
+        pre.
+        h2(id='first-deployment:1533b6ea89e8e4028a5a73e91a70fd69') First Deployment
+        p Congratulations! You have the simplest thing that can possibly work. Now it’s
+          | time to send it off to
+          em the Internet
+          | . Serverless has a handy interactive CLI
+          | for deploying code, called
+          code serverless dash
+          | . The hotkey that’s important here
+          | is
+          code Ctrl-A
+          |  to select all endpoints and functions, and then use the arrow keys
+          | to move down to the
+          code Deploy
+          |  option.
+        pre.
+        p Now the catfacts-py application is live! You can copy the API-Gateway link into
+          | your browser, or use
+          code curl
+          |  to test from the command line. You should see
+          | something like this:
+        pre.
+        p Cool, but what if you want
+          em better
+          |  catfacts, with ASCII art? No problem. In
+          | the next section we’ll use an external library to prettify our catfacts.
+        h2(id='prettified-cat-facts:1533b6ea89e8e4028a5a73e91a70fd69') Prettified Cat Facts
+        p To make cat facts that pretty-print, we’ll have to add a URL parameter to
+          | signal whether we want the JSON value to be colorful. In your
+          code s-function.json
+          | change the
+          code requestTemplates
+          |  key to:
+        pre.
+        p This will pass through the value for “color” in the request URL, as in
+          code http://...../show?color=red
+          | . To handle that in code, you can read the
+          code event
+          | to get the value of the parameter. Here’s the new handler function that takes
+          code ?color
+          |  and returns the response with the right shell escapes.
+        p For coloration, I’ll use the
+          a(href='https://pypi.python.org/pypi/termcolor') termcolor
+          |  library to convert color names
+          | into the proper shell escapes. Here’s how to use
+          code termcolor
+          |  inside our
+          | function.
+        pre.
+        h2(id='handling-dependencies:1533b6ea89e8e4028a5a73e91a70fd69') Handling Dependencies
+        p To use the
+          code termcolor
+          |  library (which is providing the escape sequences), we
+          | need to make sure the library is in our deployment package. In Node.js it’s
+          | traditional to have a
+          code node_modules
+          |  directory alongside your code, while
+          | Python typically uses system packages or virtual environments for dependencies.
+          | In Lambda, you need to have all the Python libraries you want to use included
+          | in the deployment zipfile.
+        p To do this, Serverless recommends using the created-by-default
+          code vendored/
+          | directory and a component-level
+          code requirements.txt
+          |  file. Python packaging is
+          | outside the scope of this article, but for now you can just add
+          code termcolor
+          |  as
+          | a new line in the
+          code requirements.txt
+          |  file.
+        p Once you’ve done that, install the dependency in your
+          code vendored
+          |  directory by
+          | running:
+        pre.
+        p With dependencies taken care of, use
+          code serverless dash
+          |  again to deploy the
+          | endpoint and function.
+        h2(id='trying-out-prettification:1533b6ea89e8e4028a5a73e91a70fd69') Trying Out Prettification
+        p To test the coloring, you’ll want to use a terminal. I used a subshell to send
+          | the output through
+          code echo
+          |  so my terminal interpreted the color codes correctly,
+          | but this depends on how your shell is configured.
+        p
+        pre.
+        p
+        p
+          img.img-responsive(src='/images/2016-02-color-demo.png', alt='error: index out of range for positional param at position 1')
+        h2(id='wrapping-up:1533b6ea89e8e4028a5a73e91a70fd69') Wrapping Up
+        p In this post, we’ve covered the basics of using Python in
+          a(href='http://serverless.com/') Serverless
+          | . Most tutorials that are Node.js focused are still
+          | really helpful, even for Python developers, since much of Serverless is
+          | language-agnostic like the request/response templating, deployment, and
+          | plugins.
+          a(href='http://blog.zerosharp.com/serverless-framework-part-1-up-and-running/') This
+          a(href='http://blog.zerosharp.com/serverless-framework-part-2-typescript-and-mocha/') giant
+          a(href='http://blog.zerosharp.com/serverless-framework-part-3-the-guts/') five
+          a(href='http://blog.zerosharp.com/serverless-framework-part-4-connecting-the-parts/') part
+          a(href='http://blog.zerosharp.com/serverless-framework-part-5-pulling-in-a-node-package/') series
+          |  on using
+          | TypeScript from ZeroSharp is top notch, and the testing, deployment, and
+          | routing concepts apply to Python as well.
+        p The full code for this app is on Github at
+          a(href='https://github.com/ryansb/serverless-cat-facts') ryansb/serverless-cat-facts
+          | . To use it, clone the repo and run
+          code serverless project init
+          |  to kick off the CloudFormation deployment, then use
+          code serverless dash deploy
+          |  to deploy your function and API endpoints.
+        p For more advanced info about Python dependencies, check out my post on
+          a(href='https://serverlesscode.com/post/deploy-scikitlearn-on-lamba/')
+            | using
+            | scikit-learn on Lambda
+          |  to see how to handle C libraries and include
+          | them in Lambda deploy packages.
+        p Keep up with future posts via
+          a(href='https://serverlesscode.com/index.xml') RSS
+          |  or subscribe to the
+          a(href='https://serverlesscode.com/mail/') mailing list
+          | . If
+          | you have suggestions, questions, or comments feel free to email me,
+          a(href='mailto:ryan@serverlesscode.com') ryan@serverlesscode.com
+          | .
+        hr
+        p
+          a(href='https://twitter.com/share?url=https%3a%2f%2fserverlesscode.com%2fpost%2fpython-on-serverless-intro%2f&text=New%20ServerlessCode%20article%2c%20%22Using%20Python%20in%20the%20Serverless%20Framework%22%20via%20%40ryan_sb') Tweet this
+          | ,
+          a(href='https://news.ycombinator.com/submitlink?u=https%3a%2f%2fserverlesscode.com%2fpost%2fpython-on-serverless-intro%2f&t=Using%20Python%20in%20the%20Serverless%20Framework') send to Hackernews
+          | , or
+          a(href='http://www.reddit.com/submit?url=https%3a%2f%2fserverlesscode.com%2fpost%2fpython-on-serverless-intro%2f&title=Using%20Python%20in%20the%20Serverless%20Framework%20on%20serverlesscode.com') post on Reddit
