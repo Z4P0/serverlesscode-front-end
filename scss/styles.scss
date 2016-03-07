@@ -53,3 +53,8 @@
   color: $white;
   text-shadow: none;
 }
+
+.h1 {
+  font-size: rem-calc(14);
+  text-transform: uppercase;
+}

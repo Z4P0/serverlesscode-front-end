@@ -3,7 +3,8 @@ html(lang="en").no-js
   head
     meta(charset="utf-8")
     meta(http-equiv="X-UA-Compatible", content="IE=edge,chrome=1")
-    title Serverless Code Front-End
+    block title
+      title Serverless Code
     meta(name="description", content="Front-end source for serverlesscode.com")
     meta(name="viewport", content="width=device-width, initial-scale=1")
     link(rel="apple-touch-icon", href="apple-touch-icon.png")
@@ -11,19 +12,21 @@ html(lang="en").no-js
     link(rel="stylesheet", href="css/styles.css")
 
   body
-    a(href="#main").show-for-sr Skip to main content
+    a(href="#main").show-on-focus Skip to main content
     .container
       header.header
         .row.page-section
           .columns
-            h1 Serverless Code Front-End
-      main#main
-        .row.page-section
-          .columns.medium-8.medium-centered.large-6
-            p Front-end source for serverlesscode.com
+            h1.h1 Serverless Code
+      main#main.main
+        block content
+          .row.page-section
+            .columns.medium-8.medium-centered.large-6
+              p Front-end source for serverlesscode.com
       footer.footer.jet-bg.white
         .row.thin-page-section.text-right
           .columns
-            small Serverless Code Front-End / z a p o / 2016
+            small &copy; 2016 Ryan Scott Brown. Code released under the Apache 2.0 license.
+
 
     script(src="js/scripts.js")
