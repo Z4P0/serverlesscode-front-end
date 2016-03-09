@@ -1122,7 +1122,7 @@ abbr {
   border-bottom: 1px dotted #444444; }
 
 code {
-  font-family: Consolas, "Liberation Mono", Courier, monospace;
+  font-family: "Source Code Pro", Consolas, "Liberation Mono", Courier, monospace;
   font-weight: normal;
   color: #444444;
   background-color: #e6e6e6;
@@ -1134,7 +1134,7 @@ kbd {
   margin: 0;
   background-color: #e6e6e6;
   color: #444444;
-  font-family: Consolas, "Liberation Mono", Courier, monospace; }
+  font-family: "Source Code Pro", Consolas, "Liberation Mono", Courier, monospace; }
 
 .subheader {
   margin-top: 0.2rem;
@@ -1596,9 +1596,53 @@ select {
   color: #fefefe;
   text-shadow: none; }
 
+.container {
+  overflow: hidden; }
+
 .h1 {
   font-size: 0.875rem;
-  text-transform: uppercase; }
+  text-transform: uppercase;
+  margin: 0; }
+  .h1 a {
+    display: block;
+    color: inherit; }
+
+.posted:before {
+  content: "posted: "; }
+
+.updated:before {
+  content: "updated: "; }
+
+.article-meta {
+  font-size: 0.75rem; }
+
+.global-nav {
+  position: relative; }
+
+.global-nav-toggle {
+  display: block;
+  text-align: right; }
+
+.site-nav-list {
+  margin: 0;
+  list-style-type: none;
+  text-align: right;
+  -webkit-transition: -webkit-transform 0.3s ease;
+  transition: -webkit-transform 0.3s ease;
+  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, -webkit-transform 0.3s ease;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  -webkit-transform: translateX(100%);
+          transform: translateX(100%); }
+  .site-nav-list.active {
+    -webkit-transform: translateX(0);
+            transform: translateX(0); }
+
+.global-footer {
+  background-color: #333333;
+  color: #fefefe; }
 
 @media screen and (min-width: 40em) {
   .row .row {
@@ -2018,7 +2062,16 @@ select {
   .medium-icon-5x {
     font-size: 5rem; }
   .medium-icon-6x {
-    font-size: 6rem; } }
+    font-size: 6rem; }
+  .site-nav-list {
+    -webkit-transform: translateX(0);
+            transform: translateX(0); }
+  .site-nav-list li {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 0.9375rem; }
+  .site-nav-list li:first-child {
+    margin-left: 0; } }
 
 @media screen and (min-width: 40em) and (min-width: 40em) {
   .medium-expand {

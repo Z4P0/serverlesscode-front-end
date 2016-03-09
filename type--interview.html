@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <script type="text/javascript">
       WebFontConfig = {
-        google: { families: [ 'Source+Sans+Pro:400,700,300italic:latin' ] }
+        google: { families: [ 'Source+Code+Pro::latin', 'Source+Sans+Pro:400,700:latin' ] }
       };
       (function() {
         var wf = document.createElement('script');
@@ -24,10 +24,22 @@
   </head>
   <body><a href="#main" class="show-on-focus">Skip to main content</a>
     <div class="container">
-      <header class="header">
+      <header class="global-header">
         <div class="row page-section">
-          <div class="columns">
-            <h1 class="h1">Serverless Code</h1>
+          <div class="columns small-7 medium-4">
+            <h1 class="h1"><a href="index.html">Serverless Code</a></h1>
+          </div>
+          <div class="columns small-5 medium-8">
+            <nav class="global-nav">
+              <h2 class="show-for-sr">Site Navigation</h2><a data-toggle="site-nav-list" class="global-nav-toggle show-for-small-only">Menu</a>
+              <ul id="site-nav-list" data-toggler=".active" class="site-nav-list">
+                <li><a href="#">Articles</a></li>
+                <li><a href="#">Interviews</a></li>
+                <li><a href="#">Tutorials</a></li>
+                <li><a href="#">About</a></li>
+                <li><a href="#">Archive</a></li>
+              </ul>
+            </nav>
           </div>
         </div>
       </header>
@@ -38,9 +50,16 @@
           </div>
         </div>
       </main>
-      <footer class="footer jet-bg white">
-        <div class="row thin-page-section text-right">
-          <div class="columns"><small>&copy; 2016 Ryan Scott Brown. Code released under the Apache 2.0 license.</small></div>
+      <footer class="global-footer jet-bg white">
+        <div class="row thin-page-section">
+          <div class="columns small-12 medium-4">
+            <h2>Newsletter Signup</h2>
+            <form action="#">
+              <input type="email" placeholder="email">
+              <input type="submit">
+            </form>
+          </div>
+          <div class="columns small-12 medium-8 text-right"><small>&copy; 2016 Ryan Scott Brown. Code released under the Apache 2.0 license.</small></div>
         </div>
       </footer>
     </div>
