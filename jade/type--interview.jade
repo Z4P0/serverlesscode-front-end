@@ -1,9 +1,219 @@
 extends ./type--page.jade
 
 block title
-  title Interview | Serverless Code
+  title Building the Latest Campaign for David Guetta | Interview | Serverless Code
 
 block content
-  .row.page-section
-    .columns.medium-8.medium-centered.large-6
-      h1 Interview title
+  article.article.interview
+    .row.align-center
+      .column.small-12.medium-10.large-8
+        //- header
+        header.article-header
+          h1 Interview: Building The Latest Campaign For David Guetta
+          p.subtitle Building An Infinitely Scaleable Online Recording Campaign For David Guetta
+          .article-meta
+            p
+              <a href="/categories/interview">Interview</a>
+              | //
+              <span class="meta">Posted by <a href="https://twitter.com/ryan_sb">Ryan S. Brown</a> on Wed, Jan 13, 2016
+            strong.xtra-thin-margin-right tags:
+            ul.inline-list.inline-block
+              li <a href="/tags/lambda" >lambda</a>
+              li <a href="/tags/apigateway" >apigateway</a>
+              li <a href="/tags/serverless-framework" >serverless framework</a>
+
+        //- content
+        .row.align-center
+          .column.small-12.medium-10.
+            <div class="leadin">
+              <p>Paging David Guetta fans: this week we have an interview with the team that
+              built the site behind his latest ad campaign. On the site, fans can record
+              themselves singing along to his single, &ldquo;This One&rsquo;s For You&rdquo; and build an album
+              cover to go with it.</p>
+
+              <p>Under the hood, the site is built on Lambda, API Gateway, and CloudFront.
+              Social campaigns tend to be pretty spiky &ndash; when there&rsquo;s a lot of press a
+              stampede of users can bring infrastructure to a crawl if you&rsquo;re not ready for
+              it. The team at <a href="https://parall.ax/">parall.ax</a> chose Lambda because there are no
+              long-lived servers, and they could offload all the work of scaling their app up
+              and down with demand to Amazon.</p>
+
+              <p>James Hall from <a href="https://parall.ax/">parall.ax</a> is going to tell us how they built an
+              internationalized app that can handle any level of demand from nothing in just
+              six weeks.</p>
+            </div>
+
+
+            <h2 id="the-interview:cf71cc4b7b93e201e3b60fcc1b56437d">The Interview</h2>
+
+            <p class="question">
+            What is <a href="https://parall.ax">parall.ax</a>? Tell me about your company
+            (size, specialties, etc)
+            </p>
+
+            <p>Parallax is a digital agency; we provide a range of services including
+            application development, security and design services. We have 25 full-time
+            employees as well as some external contractors. We specialise in providing
+            massively scaleable solutions, with a particular focus on sports, advertising,
+            and FMCG (Fast Moving Consumer Goods).</p>
+
+            <p class="question">
+            Tell me a little about the app, what problem is it solving?
+            </p>
+
+            <p>The app is part of a huge marketing campaign for David Guetta&rsquo;s new release
+            &ldquo;This One&rsquo;s For You&rdquo; &ndash; the official anthem of the UEFA EURO 2016 finals. We&rsquo;re
+            inviting fans &ndash; hopefully a million by March &ndash; into a virtual recording studio
+            and giving them the chance to sing along with Guetta. Not only will some of
+            their voices be included on the final song, we also create personalised album
+            artwork with their name and favourite team. This can be shared among friends,
+            increasing engagement and allowing more fans to become a part of the campaign.
+            The whole site has been built in twelve languages, incorporating video content
+            of the DJ himself and a chance to win a trip to Paris. You can check it out
+            over at <a href="https://thisonesforyou.com/">thisonesforyou.com</a>.</p>
+
+            <p class="question">
+            Other than Lambda, what other technologies is the app using? This
+            includes frontend, mobile, databases, whatever you can share.
+            </p>
+
+            <p><img src="/images/guetta_article/image04.png" alt="AWS service architecture diagram" class="img-responsive">
+            <em>Image credit: Parallax Agency Ltd.</em></p>
+
+            <p>On the backend we use a variety of technologies to deliver a completely
+            scaleable architecture. We use <a href="http://serverless.com">Serverless</a> (formerly JAWS) and CloudFormation to
+            orchestrate the entire platform in code.</p>
+
+            <p>Requests are routed via CloudFront, with static assets cached at Edge locations
+            nearest to the user requesting them. When the page first loads, everything is
+            entirely static. A UUID is generated in the client browser - this is used for
+            all future API request and allows us to associate different actions in the page
+            together without having to serve cookies. The randomness of this value is
+            important, so the library uses timing and crypto functions (where available) to
+            derive random seed data.</p>
+
+            <p><img src="/images/guetta_article/image02.png" alt="CloudFormation and S3 integration diagram" class="img-responsive">
+            <em>Image credit: Amazon Web Services</em></p>
+
+            <p>The origin of the static assets is a simple S3 bucket. These are uploaded via a
+            script on deployment.</p>
+
+            <p>A language detection endpoint then sends back the Accept-Language header and
+            also country code that the request was received from. This is using a basic
+            Lambda function. Another endpoint adds subscriber data to DynamoDB, as well as
+            sending them a welcome email via Amazon SES. To make the recording work, we
+            have an endpoint which issues S3 tokens for a path named after the UUID
+            provided. Uploads are then directly posted to S3 from the browser.</p>
+
+            <p>The most useful application of Lambda was the image generation endpoint. We
+            take an image of the user&rsquo;s favourite team flag, overlay a picture of Guetta,
+            then add their name. This is then uploaded to S3, along with a Facebook and
+            Twitter sized graphic. We also upload a static HTML file, which points to this
+            unique graphic. This ensures when people share the URL it will display their
+            custom artwork. We use Open Graph image tags in the page for this.</p>
+
+            <p>On the frontend, we used Brunch to compile the handlebars templates, compile
+            SASS, prefix the CSS and any other build tasks.</p>
+
+            <p>The recording interface itself has three implementations. The &ldquo;A-grade&rdquo;
+            experience is the WebRTC recorder, which uses the new HTML5 functionality to
+            record directly from your microphone. We then have a Flash fallback for the
+            same experience, this is for desktop browsers without WebRTC support. Then
+            finally we have a file input that prompts users to record on mobile.</p>
+
+            <p class="question">
+            Were there other solutions you considered? If yes, what were the other
+            options? How was the decision to use Lambda made?
+            </p>
+
+            <p>Yes, absolutely. Our regular stack is LAMP, built on top of CloudFront, Elastic
+            Load Balancers and EC2 nodes. This would have scaled, but it would have been
+            much more difficult to scale as quickly and as simply as it is using a
+            Lambda-based architecture. We&rsquo;d have had to build a queueing system for the
+            image generation, then spin up EC2 nodes dedicated to making those images based
+            on the throughput.</p>
+
+            <p>Writing a simple Lambda function and letting Amazon do all the hard work seemed
+            like the obvious choice.</p>
+
+            <p class="question">
+            How large was the team? Did any/all of them have experience with Lambda
+            already, or were they coming from other areas of expertise?
+            </p>
+
+            <p>The team at Parallax consisted of five people. Tom Faller was the Account
+            Manager, responsible for the day-to-day running of the project. I was the
+            backend developer creating the Lambda functions and designing the cloud
+            architecture. Amit Singh was primarily frontend, but worked on many of the glue
+            parts between the interface and the backend JS. Chris Mills was QA and Systems,
+            and linked to the Serverless (formerly JAWS) project in the first place. Jamie
+            Sefton was another JS developer and worked on integrating compatibility
+            fallbacks into the codebase, including a Flash-based and input-based recording
+            experience as a fallback for devices that don&rsquo;t support WebRTC. I&rsquo;ve had
+            experience with Lambda before, but it was new for the other team members.</p>
+
+            <p class="question">
+            About how long did you spend developing the app? Was it any faster than
+            if you were writing in another framework? (Express, Rails, whatever your
+            "home turf" is)
+            </p>
+
+            <p>I&rsquo;d say around six or seven weeks in total, though there was plenty of research
+            and prototyping done beforehand to arrive at the correct architecture design.
+            For the amount of scalability required, it would have taken much longer to
+            ensure it was just as robust using our &ldquo;home turf&rdquo;.</p>
+
+            <p class="question">
+            How are you deploying the application? Are you using a CI/CD service?
+            </p>
+
+            <p>The application is deployed from Atlassian Bamboo. The codebase lives in Stash.
+            Each and every branch gets its own deployment URL which is posted into our
+            company chat once built. This lets us quickly test and decide if changes are
+            mergeable.</p>
+
+            <p><img src="/images/guetta_article/image05.png" alt="Lambda deployment bot in action" class="img-responsive">
+            <em>Image credit: Parallax Agency Ltd.</em></p>
+
+            <p class="question">
+            What monitoring do you have in place? Is there anything you want to
+            monitor but don't/can't yet?
+            </p>
+
+            <p>For frontend JS errors we use Bugsnag; for this type of application this is the
+            easiest way to see if there&rsquo;s a problem anywhere in your stack. If error spikes
+            are bigger than traffic spikes you know something has gone wonky. We usually
+            use NewRelic for the backend, but as all the backend code lives in Lambda
+            functions we&rsquo;ve opted to use CloudWatch.</p>
+
+            <p class="question"> How are you testing changes before they go to production? Do you have testing/staging environments? </p>
+
+            <p>Yeah absolutely. Every commit and branch pushed to Stash is deployed to a testing environment. For the static assets and frontend JavaScript, this uses bamboo, and creates a new folder for every branch and build number. For the lambda functions, those were updated to each environment using <code>serverless dash</code>.</p>
+
+            <p class="question"> Was there anything that surprised you along the way? Were certain tasks easier or harder than you'd expected? </p>
+
+            <p>The server Lambda runs on lacks any fonts with Japanese and Chinese characters, which is to be expected, but wasn&rsquo;t something we&rsquo;d planned for in the development. When an operating system renders a particular font and it doesn&rsquo;t contain a particular glyph, it will fallback to the system installed multilingual Unicode font. This happens on the web automatically, but inside ImageMagick on a bare server this won&rsquo;t happen. This means we had to ship a large Unicode font in our endpoint. We reduced the performance impact of this by only routing non-Latin names to the Unicode endpoint.</p>
+
+            <p><img src="/images/guetta_article/image00.png" alt="Helvetica without unicode" class="img-responsive"> Helvetica, for example, doesn&rsquo;t include any Asian Glyphs <img src="/images/guetta_article/image01.png" alt="Arial with unicode" class="img-responsive"> But Arial does</p>
+
+            <p class="question"> Were there pain points in the development process that you found, and how would you want to fix them? </p>
+
+            <p>There&rsquo;s some issues with multiple branches and the early Serverless (formerly JAWS) framework. Say if we&rsquo;re adding an endpoint in one branch, and another in another branch, they can&rsquo;t both be deployed to the same environment stage. This is something we worked around, and we&rsquo;ll be looking to contribute some helpful tools back to Serverless to deal with this.</p>
+
+            <p class="question"> Are there any tools or libraries you found particularly helpful that you'd like more people to know about? </p>
+
+            <p>There are a couple of testing tools I’d highly recommend. Cameras and microphones behave very differently in emulators - sometimes they’re not even simulated at all! This means we had to use real devices for our testing. We used a <a href="https://www.vanamco.com/devicelab/">Vanamco Device Lab</a> along with five devices that we consider to be a good spread. We use this alongside Ghostlab which allows us to have the same page open on all devices and keep them in sync. It includes a web inspector to tweak CSS and run debugging JS. Then to increase Android coverage we used <a href="http://testdroid.com/">testdroid</a>. This is a brilliant service that allows you to use real devices remotely. Open the camera app and you can see inside a data centre. I’ve been eagerly awaiting a testdroid engineer to poke his head into a rack, but have so far been disappointed!</p>
+
+            <p><img src="/images/guetta_article/image03.png" alt="AWS service architecture diagram" class="img-responsive"> <em>Testdroid using a Google Nexus 10</em></p>
+
+            <h2 id="wrapping-up:cf71cc4b7b93e201e3b60fcc1b56437d">Wrapping Up</h2>
+
+            <p>Thanks again to James Hall for the inside view on CI, mobile testing, and Unicode workarounds for all-Lambda backends. To learn more about the Serverless Application Framework, check out their <a href="http://serverless.com">site</a> or their <a href="https://gitter.im/serverless/serverless">gitter.im chatroom</a>.</p>
+
+            <p><strong>Disclosure:</strong> I have no relationship to Parallax Agency Ltd., but they build cool projects and this interview covers just one of them.</p>
+
+            <p>Keep up with future posts via <a href="https://serverlesscode.com/index.xml">RSS</a> or
+            subscribe to the <a href="/mail/">mailing list</a>. If you have suggestions, questions, or
+            comments feel free to email me
+            <a href="mailto:ryan@serverlesscode.com">ryan@serverlesscode.com</a>.</p>
+
