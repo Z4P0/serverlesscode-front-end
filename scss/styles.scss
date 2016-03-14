@@ -56,6 +56,15 @@
   text-shadow: none;
 }
 
+html {
+  @include breakpoint(medium) {
+    font-size: 110%;
+  }
+  @include breakpoint(large) {
+    font-size: 125%;
+  }
+}
+
 .container {
   overflow: hidden;
 }
@@ -69,30 +78,6 @@
     color: inherit;
   }
 }
-
-.posted {
-  &:before {
-    content: "posted: ";
-  }
-}
-
-.updated {
-  &:before {
-    content: "updated: ";
-  }
-}
-
-.article-meta {
-  font-size: rem-calc(12);
-}
-
-// pre code {
-//   display: block;
-//   overflow-x: auto;
-//   padding: 1rem;
-//   background: #f9f9f9;
-//   margin-bottom: 1.5rem;
-// }
 
 .global-nav {
   position: relative;
@@ -111,12 +96,19 @@
   position: absolute;
   top: 100%;
   right: 0;
-  transform: translateX(100%);
+  transform: translateX(125%);
+  background-color: $white;
+  padding-top: rem-calc(15);
+  padding-left: rem-calc(30);
+  padding-bottom: rem-calc(15);
   &.active {
     transform: translateX(0);
   }
   @include breakpoint(medium) {
     transform: translateX(0);
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: 0;
     li {
       display: inline-block;
       vertical-align: middle;
@@ -133,3 +125,89 @@
   background-color: $oil;
   color: $white;
 }
+
+
+// article styles
+.article {
+  margin-bottom: rem-calc(50);
+  h2 {
+    margin-top: rem-calc(60);
+    margin-bottom: rem-calc(30);
+  }
+  h3 {
+    margin-top: rem-calc(50);
+    margin-bottom: rem-calc(20);
+  }
+
+  @include breakpoint(medium) {
+    margin-bottom: rem-calc(80);
+  }
+
+  @include breakpoint(large) {
+    margin-bottom: rem-calc(110);
+  }
+}
+
+.article-header {
+  margin: rem-calc(50 0 30);
+  @include breakpoint(medium) {
+    margin: rem-calc(60 0 40);
+  }
+  @include breakpoint(large) {
+    margin: rem-calc(70 0 50);
+  }
+}
+
+.article-meta {
+  font-size: rem-calc(12);
+  margin: rem-calc(20 0 40);
+  p, ul {
+    margin-bottom: 0;
+  }
+}
+.posted {
+  &:before {
+    content: "posted: ";
+  }
+}
+
+.updated {
+  &:before {
+    content: "updated: ";
+  }
+}
+
+.question {
+  font-weight: $bold;
+  margin-top: rem-calc(40);
+  @include breakpoint(medium) {
+    position: relative;
+    left: rem-calc(-30);
+  }
+}
+
+.leadin {
+  font-size: 105%;
+  font-style: italic;
+}
+
+.subtitle {
+  font-size: rem-calc(20);
+  line-height: 1.4;
+  @include breakpoint(medium) {
+    font-size: rem-calc(22);
+  }
+  @include breakpoint(large) {
+    font-size: rem-calc(24);
+  }
+}
+
+
+
+
+// .inline-list {
+//   li {
+//     display: inline-block;
+//     vertical-align: top;
+//   }
+// }
