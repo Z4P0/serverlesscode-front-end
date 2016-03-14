@@ -1,162 +1,222 @@
 extends ./type--page.jade
 
 block title
-  title Using Python In The Serverless Framework | Serverless Code
+  title Using Scikit-Learn In AWS Lambda | Serverless Code
 
 block content
   article.article.tutorial
     .row.align-center.page-section
-      .column.small-12.medium-8
-        h1 Using Python In The Serverless Framework
-        p.lead Take The Python Support In The Serverless Framework For A Spin
-        .article-meta.thick-margin-bottom
-          span.posted Fed 21, 2016
-          br
-          em.updated March 8, 2016
+      .column.small-12.medium-10.large-8
+        .article-header
+          h1 Using Scikit-Learn In AWS Lambda
+          p.subtitle Use Ansible And Boto To Build Scikit-Learn For Use In Lambda
+          .article-meta.thick-margin-bottom
+            span.posted Fed 21, 2016
+            br
+            em.updated March 8, 2016
         .row.align-center
-          .column.small-12.medium-10
-            p The native language of the <a href="http://serverless.com/">Serverless Framework</a> is Javascript, since that’s both the default runtime for Lambda and the language the <code>serverless</code> command-line tool is written in. But since version 0.2.1 Serverless has supported deploying services to Lambda’s Python 2.7 environment.
-            p In this post we’ll start a new Serverless project and use the Python runtime to make a service that gives out the latest and greatest feline facts. We’ll call it <code>catfacts.py</code>.
-            p At the time of this writing, version 0.4.2 is the latest version, so all examples will be based on that.
-            <h2 id="bootstrapping:1533b6ea89e8e4028a5a73e91a70fd69">Bootstrapping</h2>
-            p There are a few options for installing the Serverless CLI, but the quickest is to do <code>npm install -g serverless</code>. For more installation options, see the <a href="http://docs.serverless.com/docs/installing-serverless">installation docs</a>. There’s a command to create a new project and deploy S3 buckets to handle assets and IAM roles.
-            pre.docs-code
-              code.bash.hljs $ serverless project create \
-                | --region us-east-1 \
-                | --name catfacts \
-                | --domain catfacts.serverlesscode.com
-            div.
-              <p>This sets up the base structure for the project, you’ll want to specify a different value for the <code>--domain</code> option to avoid conflicting with my project bucket. Wait a few minutes for CloudFormation to build your resources and then we can create the <a href="http://docs.serverless.com/docs/component">component</a> where our API will live.</p>
-              <pre><code class="bash hljs">$ serverless component create -r python2.7
-              Serverless: Enter a name <span class="hljs-keyword">for</span> your new component:  (nodejscomponent) facts
-              Serverless: Installing default python dependencies with pip...
+          .column.small-12.medium-10.
+            <p>Lambda is a neat tool for running infrequent jobs, and not having to maintain
+            any servers is a blessing. There is a tradeoff for this ease of use: you give
+            up some control, and need to build standalone packages of stacks like
+            <a href="http://scikit-learn.org/">scikit-learn</a> if you need them. Scikit-learn depends on
+            <a href="http://www.numpy.org/">numpy</a> and <a href="http://scipy.org/">scipy</a>, which in turn require C and Fortran (!!!)
+            libraries. This makes getting all these dependencies into one Lamdba deploy
+            package interesting.</p>
 
-              $ serverless <span class="hljs-keyword">function</span> create facts/show
-              </code></pre>
-              <h2 id="writing-common-code:1533b6ea89e8e4028a5a73e91a70fd69">Writing Common Code</h2>
-              <p>Now that we have a function, let’s write the shared code that all functions will need. In this case, all our functions need to be able to read facts about cats from our JSON file format. Here’s an example file with two fun feline facts.</p>
-              <pre><code class="json hljs">[
-                  <span class="hljs-string">"The average cat is 70% fluff"</span>,
-                  <span class="hljs-string">"When a cat rubs itself against your leg, it is releasing a pheremone to assert its ownership of you to other cats."</span>
-              ]
-              </code></pre>
-              <p>The format is a simple JSON list. The full fact list is <a href="https://github.com/ryansb/serverless-cat-facts/blob/master/facts/catfacts.json">here</a> for you to copy. Put it in the component directory, <code>facts</code>, so it will be deployed along with any function in the component.</p>
-              <p>Here’s the contents of <code>facts/lib/__init__.py</code> that will take our <code>catfacts.json</code> file and return a parsed version.</p>
-              <pre><code class="python hljs"><span class="hljs-keyword">import</span> json
-              <span class="hljs-keyword">import</span> os
+            <p>This post covers getting scikit-learn and its dependencies built and packaged
+            for Lambda using Ansible and EC2. This means there&rsquo;s no need to set up a build
+            environment on your local box, and you can get the package from S3 when it&rsquo;s
+            complete to reuse again and again.</p>
 
-              here = os.path.dirname(os.path.realpath(__file__))
+            <p>If you want to skip ahead, all the code to build sklearn (and a ready-to-use
+            <code>.zip</code>) are on Github at <a href="https://github.com/ryansb/sklearn-build-lambda">ryansb/sklearn-build-lambda</a>. Feature
+            requests (and improvements) are welcome via pull requests, issues, or tweets
+            <a href="https://twitter.com/ryan_sb">@ryan_sb</a>.</p>
 
-              <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">all_facts</span><span class="hljs-params">()</span>:</span>
-                  <span class="hljs-keyword">with</span> open(os.path.join(here, <span class="hljs-string">'../catfacts.json'</span>)) <span class="hljs-keyword">as</span> fact_file:
-                      facts = json.load(fact_file)
-                      <span class="hljs-keyword">return</span> facts
-              </code></pre>
-              <p>In the <code>facts/show/handler.py</code>, we can call this and then pick a fact to send back to the user.</p>
-              <pre><code class="python hljs"><span class="hljs-keyword">import</span> json
-              <span class="hljs-keyword">import</span> logging
-              <span class="hljs-keyword">import</span> random
+            <h1 id="constriants:67704fbd5ee390dbedb80bc0a941df26">Constriants</h1>
 
-              log = logging.getLogger()
-              log.setLevel(logging.DEBUG)
+            <p>In AWS Lambda, there are some limitations to contend with when using Python.
+            Broadly, they are:</p>
 
-              <span class="hljs-comment"># this adds the component-level `lib` directory to the Python import path</span>
-              <span class="hljs-keyword">import</span> sys, os
-              <span class="hljs-comment"># get this file's directory independent of where it's run from</span>
-              here = os.path.dirname(os.path.realpath(__file__))
-              sys.path.append(os.path.join(here, <span class="hljs-string">"../"</span>))
-              sys.path.append(os.path.join(here, <span class="hljs-string">"../vendored"</span>))
+            <ol>
+            <li>C libraries for Python modules can&rsquo;t be installed ahead of time</li>
+            <li>There is a size limit (50MB at this time) of the zipped code, including
+            libraries</li>
+            <li>You don&rsquo;t have the ability to change the <code>LD_LIBRARY_PATH</code> of your script
+            before it runs, so you&rsquo;re stuck with what you get</li>
+            <li>You can&rsquo;t write to the system-level library paths</li>
+            </ol>
 
-              <span class="hljs-comment"># import the shared library, now anything in component/lib/__init__.py can be</span>
-              <span class="hljs-comment"># referenced as `lib.something`</span>
-              <span class="hljs-keyword">import</span> lib
+            <p>The numpy/scipy/scikit-learn stack has trouble with just about all these
+            constraints. The installed libraries, zipped, come out to 65 MB, the
+            lapack and blas shared libraries must be loaded, and they msut be compiled
+            targeting the Amazon Linux runtime environment.</p>
 
+            <h1 id="building-sklearn-on-amazon-linux:67704fbd5ee390dbedb80bc0a941df26">Building Sklearn on Amazon Linux</h1>
 
-              <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">handler</span><span class="hljs-params">(event, context)</span>:</span>
-                  log.debug(<span class="hljs-string">"Received event {}"</span>.format(json.dumps(event)))
-                  facts = lib.all_facts()
+            <p>First, I had to sort out the instance itself. I used Ansible to create the
+            instance because I wanted to be able to use this as part of an automated build
+            process. Ansible has a handy <code>ec2</code> module for creating/terminating instances.</p>
 
-                  <span class="hljs-keyword">return</span> {
-                      <span class="hljs-string">"random_fact"</span>: random.choice(facts)
-                  }
-              </code></pre>
-              <h2 id="first-deployment:1533b6ea89e8e4028a5a73e91a70fd69">First Deployment</h2>
-              <p>Congratulations! You have the simplest thing that can possibly work. Now it’s time to send it off to <em>the Internet</em>. Serverless has a handy interactive CLI for deploying code, called <code>serverless dash</code>. The hotkey that’s important here is <code>Ctrl-A</code> to select all endpoints and functions, and then use the arrow keys to move down to the <code>Deploy</code> option.</p>
-              <pre><code class="bash hljs">
-              $ serverless dash deploy
-              ---- some output excluded ----
-              Serverless: Select the assets you wish to deploy:
-                  facts/show
-                    <span class="hljs-keyword">function</span> - facts/show
-                    endpoint - facts/show@show~GET
-                  - - - - -
-                &gt; Deploy
-                  Cancel
+            <pre><code class="yaml">- register: ectwo
+              ec2:
+                key_name: "{{ ssh_key }}"
+                instance_type: t2.micro
+                image: ami-60b6c60a
+                wait: yes
+                instance_profile_name: "{{ profile_name }}"
+                user_data: "{{ lookup('file', 'sklearn_user_data.sh')}}"
 
-              Serverless: Deploying <span class="hljs-built_in">functions</span> <span class="hljs-keyword">in</span> <span class="hljs-string">"dev"</span> to the following regions: us-east-1
-              Serverless: Deploying endpoints <span class="hljs-keyword">in</span> <span class="hljs-string">"dev"</span> to the following regions: us-east-1
-              Serverless: Successfully deployed endpoints <span class="hljs-keyword">in</span> <span class="hljs-string">"dev"</span> to the following regions:
-              Serverless: us-east-1 ------------------------
-              Serverless: GET - show - https://2s75j3z966.execute-api.us-east-1.amazonaws.com/dev/show
-              </code></pre>
-              <p>Now the catfacts-py application is live! You can copy the API-Gateway link into your browser, or use <code>curl</code> to test from the command line. You should see something like this:</p>
-              <pre><code class="hljs cs">$ curl https:<span class="hljs-comment">//2s75j3z966.execute-api.us-east-1.amazonaws.com/dev/show</span>
-              {<span class="hljs-string">"random_fact"</span>: <span class="hljs-string">"The average cat is 70% fluff"</span>}
-              </code></pre>
-              <p>Cool, but what if you want <em>better</em> catfacts, with ASCII art? No problem. In the next section we’ll use an external library to prettify our catfacts.</p>
-              <h2 id="prettified-cat-facts:1533b6ea89e8e4028a5a73e91a70fd69">Prettified Cat Facts</h2>
-              <p>To make cat facts that pretty-print, we’ll have to add a URL parameter to signal whether we want the JSON value to be colorful. In your <code>s-function.json</code> change the <code>requestTemplates</code> key to:</p>
-              <pre><code class="hljs bash"><span class="hljs-string">"requestTemplates"</span>: {
-                  <span class="hljs-string">"application/json"</span>: {
-                      <span class="hljs-string">"color"</span>: <span class="hljs-string">"<span class="hljs-variable">$input</span>.params('color')"</span>
-                  }
-              },
-              </code></pre>
-              <p>This will pass through the value for “color” in the request URL, as in <code>http://...../show?color=red</code>. To handle that in code, you can read the <code>event</code> to get the value of the parameter. Here’s the new handler function that takes <code>?color</code> and returns the response with the right shell escapes.</p>
-              <p>For coloration, I’ll use the <a href="https://pypi.python.org/pypi/termcolor">termcolor</a> library to convert color names into the proper shell escapes. Here’s how to use <code>termcolor</code> inside our function.</p>
-              <pre><code class="python hljs"><span class="hljs-keyword">import</span> termcolor
+                # Give EBS volume a little more space than default
+                volumes:
+                  - device_name: /dev/xvda
+                    delete_on_termination: true
+                    volume_type: gp2
+                    volume_size: 10
 
+                # networking biz
+                region: us-east-1
+                vpc_subnet_id: "{{ subnet_id }}"
+                assign_public_ip: yes
+                groups:
+                  - default
+            </code></pre>
 
-              <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">handler</span><span class="hljs-params">(event, context)</span>:</span>
-                  log.debug(<span class="hljs-string">"Received event {}"</span>.format(json.dumps(event)))
-                  fact = random.choice(lib.all_facts())
+            <p>The dependencies for sklearn/scipy/numpy are well-documented, making
+            this part easy.</p>
 
-                  <span class="hljs-keyword">if</span> event.get(<span class="hljs-string">'color'</span>):
-                      <span class="hljs-keyword">return</span> {
-                          <span class="hljs-string">'random_fact'</span>: termcolor.colored(fact, event.get(<span class="hljs-string">'color'</span>, <span class="hljs-string">'red'</span>))
-                      }
+            <pre><code class="bash">$ yum install -y atlas-devel atlas-sse3-devel blas-devel gcc gcc-c++ lapack-devel python27-devel
+            </code></pre>
 
-                  <span class="hljs-keyword">return</span> {
-                      <span class="hljs-string">"random_fact"</span>: fact
-                  }
-              </code></pre>
-              <h2 id="handling-dependencies:1533b6ea89e8e4028a5a73e91a70fd69">Handling Dependencies</h2>
-              <p>To use the <code>termcolor</code> library (which is providing the escape sequences), we need to make sure the library is in our deployment package. In Node.js it’s traditional to have a <code>node_modules</code> directory alongside your code, while Python typically uses system packages or virtual environments for dependencies. In Lambda, you need to have all the Python libraries you want to use included in the deployment zipfile.</p>
-              <p>To do this, Serverless recommends using the created-by-default <code>vendored/</code> directory and a component-level <code>requirements.txt</code> file. Python packaging is outside the scope of this article, but for now you can just add <code>termcolor</code> as a new line in the <code>requirements.txt</code> file.</p>
-              <p>Once you’ve done that, install the dependency in your <code>vendored</code> directory by running:</p>
-              <pre><code class="hljs cmake"><span class="hljs-comment"># from the module directory, facts/</span>
-              $ pip <span class="hljs-keyword">install</span> -t vendored/ -r requirements.txt
-              Collecting termcolor (from -r requirements.txt (line <span class="hljs-number">3</span>))
-              Installing collected packages; termcolor
-              Successfully installed termcolor-<span class="hljs-number">1.1</span>.<span class="hljs-number">0</span>
+            <p>Then make a <code>virtualenv</code> for the build process to make sure all the
+            dependencies are contained and you can install the libraries.</p>
 
-              <span class="hljs-comment"># after running this, the vendored directory should look like this</span>
-              $ ls vendored
-              termcolor-<span class="hljs-number">1.1</span>.<span class="hljs-number">0</span>.dist-info  __init__.py  termcolor.py  termcolor.pyc
-              </code></pre>
-              <p>With dependencies taken care of, use <code>serverless dash</code> again to deploy the endpoint and function.</p>
-              <h2 id="trying-out-prettification:1533b6ea89e8e4028a5a73e91a70fd69">Trying Out Prettification</h2>
-              <p>To test the coloring, you’ll want to use a terminal. I used a subshell to send the output through <code>echo</code> so my terminal interpreted the color codes correctly, but this depends on how your shell is configured.</p>
-              <p></p>
-              <pre>
-                <code class="bash hljs">$ <span class="hljs-built_in">echo</span> $(curl <span class="hljs-_">-s</span> https://2s75j3z966.execute-api.us-east-1.amazonaws.com/dev/show\?color\=YOURCOLOR )</code>
-              </pre>
-              <p></p>
-              <p><img alt="error: index out of range for positional param at position 1" class="img-responsive" src="//d2q4nobwyhnvov.cloudfront.net/f2c9d102-b172-4302-9676-c51165d633ad/PwXG5ZPFnevcBQ/images/2016-02-color-demo.png"></p>
-              <h2 id="wrapping-up:1533b6ea89e8e4028a5a73e91a70fd69">Wrapping Up</h2>
-              <p>In this post, we’ve covered the basics of using Python in <a href="http://serverless.com/">Serverless</a>. Most tutorials that are Node.js focused are still really helpful, even for Python developers, since much of Serverless is language-agnostic like the request/response templating, deployment, and plugins. <a href="http://blog.zerosharp.com/serverless-framework-part-1-up-and-running/">This</a> <a href="http://blog.zerosharp.com/serverless-framework-part-2-typescript-and-mocha/">giant</a> <a href="http://blog.zerosharp.com/serverless-framework-part-3-the-guts/">five</a> <a href="http://blog.zerosharp.com/serverless-framework-part-4-connecting-the-parts/">part</a> <a href="http://blog.zerosharp.com/serverless-framework-part-5-pulling-in-a-node-package/">series</a> on using TypeScript from ZeroSharp is top notch, and the testing, deployment, and routing concepts apply to Python as well.</p>
-              <p>The full code for this app is on Github at <a href="https://github.com/ryansb/serverless-cat-facts">ryansb/serverless-cat-facts</a>. To use it, clone the repo and run <code>serverless project init</code> to kick off the CloudFormation deployment, then use <code>serverless dash deploy</code> to deploy your function and API endpoints.</p>
-              <p>For more advanced info about Python dependencies, check out my post on <a href="https://serverlesscode.com/post/deploy-scikitlearn-on-lamba/">using scikit-learn on Lambda</a> to see how to handle C libraries and include them in Lambda deploy packages.</p>
-              <p>Keep up with future posts via <a href="https://serverlesscode.com/index.xml">RSS</a> or subscribe to the <a href="https://serverlesscode.com/mail/">mailing list</a>. If you have suggestions, questions, or comments feel free to email me, <a href="mailto:ryan@serverlesscode.com">ryan@serverlesscode.com</a>.</p>
-              <hr>
-              <p><a href="https://twitter.com/share?url=https%3a%2f%2fserverlesscode.com%2fpost%2fpython-on-serverless-intro%2f&amp;text=New%20ServerlessCode%20article%2c%20%22Using%20Python%20in%20the%20Serverless%20Framework%22%20via%20%40ryan_sb">Tweet this</a>, <a href="https://news.ycombinator.com/submitlink?u=https%3a%2f%2fserverlesscode.com%2fpost%2fpython-on-serverless-intro%2f&amp;t=Using%20Python%20in%20the%20Serverless%20Framework">send to Hackernews</a>, or <a href="http://www.reddit.com/submit?url=https%3a%2f%2fserverlesscode.com%2fpost%2fpython-on-serverless-intro%2f&amp;title=Using%20Python%20in%20the%20Serverless%20Framework%20on%20serverlesscode.com">post on Reddit</a></p>
+            <pre><code class="bash">$ /usr/bin/virtualenv \
+                  --python /usr/bin/python sklearn_build \
+                  --always-copy \
+                   --no-site-packages
+            $ source sklearn_build/bin/activate
+            $ pip install --use-wheel numpy
+            $ pip install --use-wheel scipy
+            $ pip install --use-wheel sklearn
+            </code></pre>
+
+            <p>If you use a t2.micro or t2.nano instance (which I did), you&rsquo;ll also need a
+            swapfile because 1GB isn&rsquo;t enough RAM to build all the C libraries. I did,
+            since t2.nano instances cost less than a penny per hour.</p>
+
+            <pre><code class="bash">$ dd if=/dev/zero of=/swapfile bs=1024 count=1500000
+            $ mkswap /swapfile
+            $ chmod 0600 /swapfile
+            $ swapon /swapfile
+            </code></pre>
+
+            <p>We have all the dependencies in the virtualenv, but they&rsquo;re still too large to
+            use in Lambda. Next, we&rsquo;ll work on trimming down the size.</p>
+
+            <h1 id="10-pounds-of-libraries-in-a-5-pound-zip:67704fbd5ee390dbedb80bc0a941df26">10 Pounds of Libraries in a 5 Pound Zip</h1>
+
+            <p>To reduce the size of all the shared libraries, we&rsquo;ll use the <code>strip</code> command
+            and apply it to every library we can find - this will shave about 40MB off the
+            total.</p>
+
+            <pre><code class="bash">$ find "$VIRTUAL_ENV/lib64/python2.7/site-packages/" -name "*.so" | xargs strip
+            $ pushd "$VIRTUAL_ENV/lib64/python2.7/site-packages/"
+            $ zip -r -9 -q ~/venv.zip *
+            $ popd
+            </code></pre>
+
+            <p>Note also that we&rsquo;re using the <code>-9</code> compression level in the <code>zip</code> command,
+            which provides the highest compression ratio.</p>
+
+            <h1 id="ansible-for-build-processes:67704fbd5ee390dbedb80bc0a941df26">Ansible for Build Processes</h1>
+
+            <p>On small instances, it takes a while to compile all the dependencies, so we
+            need to set up Ansible to wait while that&rsquo;s happening. It takes around 15
+            minutes to build the full stack and upload to S3.</p>
+
+            <pre><code class="yaml">- s3:
+                bucket: tmp.serverlesscode.com
+                object: "sklearn/{{ ectwo.instance_ids[0] }}-site-pkgs.zip"
+                dest: /tmp/sklearn-site-packages.zip
+                mode: get
+              register: result
+              until: result.failed is not defined or result.failed == false
+              retries: 15
+              delay: 90
+            </code></pre>
+
+            <p>Using the <code>until-retry</code> pattern in Ansible, I have it check S3 for the
+            zipfile every 90 seconds, so it will wait up to 22 minutes for the instance to
+            finish the build.</p>
+
+            <pre><code class="yaml">- name: Terminate instances that were previously launched
+              ec2:
+                state: 'absent'
+                region: us-east-1
+                # get the instance ID from earlier to terminate now that the build
+                #artifacts are in S3
+                instance_ids: '{{ ectwo.instance_ids }}'
+            </code></pre>
+
+            <p>Once the archive is downloaded, Ansible kills the EC2 instance so you aren&rsquo;t
+            charged for any more time than you use.</p>
+
+            <h1 id="using-sklearn:67704fbd5ee390dbedb80bc0a941df26">Using Sklearn</h1>
+
+            <p>To actually import sklearn from your Python code in the Lambda environment, you
+            need to add your handler (mine is called <code>demo.py</code>) and it needs to load the
+            <code>.so</code> files <em>before</em> running <code>import sklearn</code>. I used the <code>ctypes</code> module to
+            load them.</p>
+
+            <pre><code class="python">import os
+            import ctypes
+
+            for d, dirs, files in os.walk('lib'):
+                for f in files:
+                    if f.endswith('.a'):
+                        continue
+                    ctypes.cdll.LoadLibrary(os.path.join(d, f))
+
+            import sklearn
+
+            def handler(event, context):
+                # do sklearn stuff here
+                return {'yay': 'done'}
+            </code></pre>
+
+            <p>I had to walk the entire <code>lib</code> directory created by my build script, because
+            there isn&rsquo;t a way in Python to manipulate the <code>LD_LIBRARY_PATH</code> in time for the
+            loader to accept the changes. This might result in more libraries than you need
+            being loaded, which is fine.</p>
+
+            <p>Loading all the libraries outside the handler saves a significant amount of
+            time for subsequent executions. In my tests with a 128MB Lambda execution
+            environment, the first execution took up to 6.2 seconds to load the code (39MB
+            zipped) and then import all the C libraries. Subsequent executions ran as
+            quickly as 4ms when reusing a warm container.</p>
+
+            <h1 id="building-deps-yourself:67704fbd5ee390dbedb80bc0a941df26">Building Deps Yourself</h1>
+
+            <p>To build all these yourself, clone <a href="https://github.com/ryansb/sklearn-build-lambda">ryansb/sklearn-build-lambda</a> and install <a href="http://docs.ansible.com/ansible/intro_installation.html">Ansible 2.0+</a> and <a href="https://github.com/boto/boto">boto 2</a>.</p>
+
+            <p>To build everything, run <code>ansible-playbook launch_sklearner.yml</code> and expect to
+            wait about 15 minutes before the built files to appear in S3. They&rsquo;ll be named
+            with the instance ID and &ldquo;site-pkgs.zip&rdquo;. For example,
+            <code>i-0c9dab6cd6dcb0d9d-site-pkgs.zip</code>. You can then download the zip and include
+            your custom code, then upload the whole thing as a Lambda function.</p>
+
+            <p>The Ansible playbook will also download the dependencies to
+            <code>/tmp/sklearn-site-packages.zip</code> for your convenience.</p>
+
+            <h1 id="wrapping-up:67704fbd5ee390dbedb80bc0a941df26">Wrapping Up</h1>
+
+            <p>Eventually, I&rsquo;ll probably expand the playbook to take <em>any</em> requirements and
+            build them on an EC2 instance, so you don&rsquo;t need to worry about any unexpected
+            differences between your build machine and your EC2 instances.</p>
+
+            <p>Keep up with future posts via <a href="https://serverlesscode.com/index.xml">RSS</a> or subscribe to the <a href="https://serverlesscode.com/mail/">mailing
+            list</a>. If you have suggestions, questions, or comments feel free to email
+            me <a href="mailto:ryan@serverlesscode.com">ryan@serverlesscode.com</a>.</p>
+
